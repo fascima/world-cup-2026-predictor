@@ -1,0 +1,22 @@
+ablation_type,experiment,validation_log_loss,validation_accuracy,selected,notes,log_loss_2022_plus,accuracy_2022_plus,log_loss_2022_world_cup,accuracy_2022_world_cup,delta_log_loss_2022_wc_vs_temp,delta_accuracy_2022_wc_vs_temp
+gradient_boosting_feature_profile,baseline_no_market,0.9164571817474716,0.5859802496580028,True,Rolling validation best row for this feature profile.,,,,,,
+gradient_boosting_feature_profile,context_no_market,0.9203628905455112,0.5971860037619698,False,Rolling validation best row for this feature profile.,,,,,,
+gradient_boosting_feature_profile,effective_market_derived,0.9203628905455112,0.5971860037619698,False,Rolling validation best row for this feature profile.,,,,,,
+gradient_boosting_feature_profile,market_full,0.9209010965004912,0.5925957592339262,False,Rolling validation best row for this feature profile.,,,,,,
+postprocess_experiment,gb_temperature_market_guardrail_wc_diagnostic_best,,,False,Post-processing or calibration experiment.,0.8631189333695933,0.607838695061169,0.9940543774244204,0.5625,-0.0237629572529119,0.03125
+postprocess_experiment,gb_temperature_two_stage_draw_effective_guardrail,,,False,Post-processing or calibration experiment.,0.8632171519899324,0.6073855913004078,1.0063567671164682,0.546875,-0.0114605675608643,0.015625
+postprocess_experiment,gb_temperature_market_guardrail,,,False,Post-processing or calibration experiment.,0.8633209073791819,0.6076121431807884,1.0079842723982295,0.546875,-0.0098330622791027,0.015625
+postprocess_experiment,gb_temperature_effective_market_guardrail,,,False,Post-processing or calibration experiment.,0.8633209073791819,0.6076121431807884,1.0079842723982295,0.546875,-0.0098330622791027,0.015625
+postprocess_experiment,gb_temperature_market_guardrail_plus_altitude,,,False,Post-processing or calibration experiment.,0.8633307868341732,0.6076121431807884,1.0079842723982295,0.546875,-0.0098330622791027,0.015625
+postprocess_experiment,gb_temperature_market_guardrail_conservative,,,False,Post-processing or calibration experiment.,0.8633630754168417,0.6076121431807884,1.0108925492455825,0.546875,-0.0069247854317502,0.015625
+postprocess_experiment,gb_temperature_phase_draw_calibrated,,,False,Post-processing or calibration experiment.,0.863394565384955,0.6073855913004078,1.0130643729838944,0.53125,-0.004752961693438,0.0
+postprocess_experiment,gb_temperature_two_stage_draw,,,False,Post-processing or calibration experiment.,0.8633597247098831,0.6071590394200271,1.0161898293955711,0.53125,-0.0016275052817613,0.0
+postprocess_experiment,gb_temperature_calibrated,,,False,Post-processing or calibration experiment.,0.8634634800991325,0.6073855913004078,1.0178173346773325,0.53125,0.0,0.0
+postprocess_experiment,gb_temperature_altitude_adjusted,,,False,Post-processing or calibration experiment.,0.8634733595541239,0.6073855913004078,1.0178173346773325,0.53125,0.0,0.0
+postprocess_experiment,gb_current,,,False,Post-processing or calibration experiment.,0.8640073844639369,0.6073855913004078,1.0187957870589264,0.53125,0.0009784523815938,0.0
+postprocess_experiment,gb_shrink_to_prior,,,False,Post-processing or calibration experiment.,0.8640073844639368,0.6073855913004078,1.0187957870589264,0.53125,0.0009784523815938,0.0
+postprocess_experiment,gb_draw_decision_rule,,,False,Post-processing or calibration experiment.,0.8640073844639369,0.606705935659266,1.0187957870589264,0.515625,0.0009784523815938,-0.015625
+postprocess_experiment,gb_draw_calibrated,,,False,Post-processing or calibration experiment.,0.8629716572697743,0.6057997281377435,1.0233586814454756,0.515625,0.0055413467681431,-0.015625
+postprocess_experiment,stacking_meta_model,,,False,Post-processing or calibration experiment.,0.8612094264459887,0.6044404168554599,1.1051354021221158,0.515625,0.0873180674447833,-0.015625
+postprocess_experiment,stacking_plus_draw_calibration,,,False,Post-processing or calibration experiment.,0.8612094264459887,0.6044404168554599,1.1051354021221158,0.515625,0.0873180674447833,-0.015625
+postprocess_experiment,logistic_current,,,False,Post-processing or calibration experiment.,0.8645837161188058,0.6044404168554599,1.1939129706197438,0.484375,0.1760956359424113,-0.046875

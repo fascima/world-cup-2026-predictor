@@ -1,0 +1,7 @@
+stage,matches,log_loss,brier_score,accuracy,decision
+baseline_before_changes,7952,0.893131,0.524111,0.595951,reference
+zero_sum_updates,7952,0.915484,0.537195,0.593939,implemented_as_config_but_disabled_by_default
+schedule_strength_adjustment,7952,0.913266,0.535720,0.594190,kept_but_needed_recent_form_to_improve
+empirical_draw_model,7952,0.916746,0.537546,0.594190,implemented_but_disabled_by_default
+recent_form_weight_0_20_selected,7952,0.891591,0.523723,0.595825,selected_default
+iterative_elo_2_passes_no_leakage,7952,0.892697,0.525659,0.599472,selected_for_higher_accuracy

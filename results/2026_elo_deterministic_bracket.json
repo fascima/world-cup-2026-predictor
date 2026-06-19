@@ -1,0 +1,240 @@
+{
+  "champion": "France",
+  "advancing_third_place_groups": [
+    "I",
+    "D",
+    "C",
+    "F",
+    "A",
+    "J",
+    "L",
+    "E"
+  ],
+  "round_of_32": [
+    {
+      "round": "round_of_32",
+      "match_number": 73,
+      "team_a": "South Korea",
+      "team_b": "Canada",
+      "winner": "Canada"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 74,
+      "team_a": "Germany",
+      "team_b": "Czech Republic",
+      "winner": "Germany"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 75,
+      "team_a": "Netherlands",
+      "team_b": "Scotland",
+      "winner": "Netherlands"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 76,
+      "team_a": "Brazil",
+      "team_b": "Japan",
+      "winner": "Brazil"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 77,
+      "team_a": "France",
+      "team_b": "United States",
+      "winner": "France"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 78,
+      "team_a": "Ecuador",
+      "team_b": "Norway",
+      "winner": "Ecuador"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 79,
+      "team_a": "Mexico",
+      "team_b": "Morocco",
+      "winner": "Mexico"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 80,
+      "team_a": "England",
+      "team_b": "Ivory Coast",
+      "winner": "England"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 81,
+      "team_a": "Turkey",
+      "team_b": "Sweden",
+      "winner": "Turkey"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 82,
+      "team_a": "Belgium",
+      "team_b": "Senegal",
+      "winner": "Belgium"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 83,
+      "team_a": "Colombia",
+      "team_b": "Croatia",
+      "winner": "Colombia"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 84,
+      "team_a": "Spain",
+      "team_b": "Austria",
+      "winner": "Spain"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 85,
+      "team_a": "Switzerland",
+      "team_b": "Algeria",
+      "winner": "Switzerland"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 86,
+      "team_a": "Argentina",
+      "team_b": "Uruguay",
+      "winner": "Argentina"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 87,
+      "team_a": "Portugal",
+      "team_b": "Panama",
+      "winner": "Portugal"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 88,
+      "team_a": "Paraguay",
+      "team_b": "Egypt",
+      "winner": "Paraguay"
+    }
+  ],
+  "round_of_16": [
+    {
+      "round": "round_of_16",
+      "match_number": 89,
+      "team_a": "Germany",
+      "team_b": "France",
+      "winner": "France"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 90,
+      "team_a": "Canada",
+      "team_b": "Netherlands",
+      "winner": "Netherlands"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 91,
+      "team_a": "Brazil",
+      "team_b": "Ecuador",
+      "winner": "Brazil"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 92,
+      "team_a": "Mexico",
+      "team_b": "England",
+      "winner": "England"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 93,
+      "team_a": "Colombia",
+      "team_b": "Spain",
+      "winner": "Spain"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 94,
+      "team_a": "Turkey",
+      "team_b": "Belgium",
+      "winner": "Belgium"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 95,
+      "team_a": "Argentina",
+      "team_b": "Paraguay",
+      "winner": "Argentina"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 96,
+      "team_a": "Switzerland",
+      "team_b": "Portugal",
+      "winner": "Portugal"
+    }
+  ],
+  "quarterfinal": [
+    {
+      "round": "quarterfinal",
+      "match_number": 97,
+      "team_a": "France",
+      "team_b": "Netherlands",
+      "winner": "France"
+    },
+    {
+      "round": "quarterfinal",
+      "match_number": 98,
+      "team_a": "Spain",
+      "team_b": "Belgium",
+      "winner": "Spain"
+    },
+    {
+      "round": "quarterfinal",
+      "match_number": 99,
+      "team_a": "Brazil",
+      "team_b": "England",
+      "winner": "England"
+    },
+    {
+      "round": "quarterfinal",
+      "match_number": 100,
+      "team_a": "Argentina",
+      "team_b": "Portugal",
+      "winner": "Argentina"
+    }
+  ],
+  "semifinal": [
+    {
+      "round": "semifinal",
+      "match_number": 101,
+      "team_a": "France",
+      "team_b": "Spain",
+      "winner": "France"
+    },
+    {
+      "round": "semifinal",
+      "match_number": 102,
+      "team_a": "England",
+      "team_b": "Argentina",
+      "winner": "Argentina"
+    }
+  ],
+  "final": [
+    {
+      "round": "final",
+      "match_number": 104,
+      "team_a": "France",
+      "team_b": "Argentina",
+      "winner": "France"
+    }
+  ]
+}

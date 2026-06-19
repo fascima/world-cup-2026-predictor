@@ -1,0 +1,2 @@
+top_probability_accuracy,decision_accuracy,log_loss,multiclass_brier_score,top_probability_predicted_draws,predicted_draws,actual_draws,draw_recall,draw_precision,non_draw_accuracy,accuracy
+0.6051200724966017,0.6051200724966017,0.8620801731527746,0.16918700681716672,48.0,48.0,1015.0,0.019704433497536946,0.4166666666666667,0.7799352750809061,0.6051200724966017

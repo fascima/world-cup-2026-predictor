@@ -1,0 +1,240 @@
+{
+  "champion": "Portugal",
+  "advancing_third_place_groups": [
+    "B",
+    "J",
+    "G",
+    "H",
+    "F",
+    "A",
+    "L",
+    "I"
+  ],
+  "round_of_32": [
+    {
+      "round": "round_of_32",
+      "match_number": 73,
+      "team_a": "Mexico",
+      "team_b": "Qatar",
+      "winner": "Qatar"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 74,
+      "team_a": "Germany",
+      "team_b": "South Africa",
+      "winner": "Germany"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 75,
+      "team_a": "Netherlands",
+      "team_b": "Scotland",
+      "winner": "Netherlands"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 76,
+      "team_a": "Brazil",
+      "team_b": "Japan",
+      "winner": "Japan"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 77,
+      "team_a": "Senegal",
+      "team_b": "Sweden",
+      "winner": "Sweden"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 78,
+      "team_a": "Ivory Coast",
+      "team_b": "France",
+      "winner": "France"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 79,
+      "team_a": "South Korea",
+      "team_b": "Uruguay",
+      "winner": "South Korea"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 80,
+      "team_a": "Ghana",
+      "team_b": "Iraq",
+      "winner": "Ghana"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 81,
+      "team_a": "United States",
+      "team_b": "Bosnia and Herzegovina",
+      "winner": "Bosnia and Herzegovina"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 82,
+      "team_a": "Iran",
+      "team_b": "Algeria",
+      "winner": "Iran"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 83,
+      "team_a": "Uzbekistan",
+      "team_b": "Croatia",
+      "winner": "Croatia"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 84,
+      "team_a": "Saudi Arabia",
+      "team_b": "Jordan",
+      "winner": "Saudi Arabia"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 85,
+      "team_a": "Switzerland",
+      "team_b": "Belgium",
+      "winner": "Switzerland"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 86,
+      "team_a": "Argentina",
+      "team_b": "Spain",
+      "winner": "Argentina"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 87,
+      "team_a": "Portugal",
+      "team_b": "Panama",
+      "winner": "Portugal"
+    },
+    {
+      "round": "round_of_32",
+      "match_number": 88,
+      "team_a": "Paraguay",
+      "team_b": "Egypt",
+      "winner": "Egypt"
+    }
+  ],
+  "round_of_16": [
+    {
+      "round": "round_of_16",
+      "match_number": 89,
+      "team_a": "Germany",
+      "team_b": "Sweden",
+      "winner": "Germany"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 90,
+      "team_a": "Qatar",
+      "team_b": "Netherlands",
+      "winner": "Qatar"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 91,
+      "team_a": "Japan",
+      "team_b": "France",
+      "winner": "Japan"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 92,
+      "team_a": "South Korea",
+      "team_b": "Ghana",
+      "winner": "South Korea"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 93,
+      "team_a": "Croatia",
+      "team_b": "Saudi Arabia",
+      "winner": "Saudi Arabia"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 94,
+      "team_a": "Bosnia and Herzegovina",
+      "team_b": "Iran",
+      "winner": "Iran"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 95,
+      "team_a": "Argentina",
+      "team_b": "Egypt",
+      "winner": "Argentina"
+    },
+    {
+      "round": "round_of_16",
+      "match_number": 96,
+      "team_a": "Switzerland",
+      "team_b": "Portugal",
+      "winner": "Portugal"
+    }
+  ],
+  "quarterfinal": [
+    {
+      "round": "quarterfinal",
+      "match_number": 97,
+      "team_a": "Germany",
+      "team_b": "Qatar",
+      "winner": "Germany"
+    },
+    {
+      "round": "quarterfinal",
+      "match_number": 98,
+      "team_a": "Saudi Arabia",
+      "team_b": "Iran",
+      "winner": "Iran"
+    },
+    {
+      "round": "quarterfinal",
+      "match_number": 99,
+      "team_a": "Japan",
+      "team_b": "South Korea",
+      "winner": "South Korea"
+    },
+    {
+      "round": "quarterfinal",
+      "match_number": 100,
+      "team_a": "Argentina",
+      "team_b": "Portugal",
+      "winner": "Portugal"
+    }
+  ],
+  "semifinal": [
+    {
+      "round": "semifinal",
+      "match_number": 101,
+      "team_a": "Germany",
+      "team_b": "Iran",
+      "winner": "Iran"
+    },
+    {
+      "round": "semifinal",
+      "match_number": 102,
+      "team_a": "South Korea",
+      "team_b": "Portugal",
+      "winner": "Portugal"
+    }
+  ],
+  "final": [
+    {
+      "round": "final",
+      "match_number": 104,
+      "team_a": "Iran",
+      "team_b": "Portugal",
+      "winner": "Portugal"
+    }
+  ]
+}

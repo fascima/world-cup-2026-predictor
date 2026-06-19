@@ -1,0 +1,4 @@
+model,matches,log_loss,brier_score,accuracy,log_loss_delta,brier_score_delta,accuracy_delta
+elo_only,320.0,0.967310708171234,0.5663333672531808,0.575,,,
+elo_plus_market_value,320.0,0.9645899876875044,0.5605994422671273,0.584375,,,
+comparison,320.0,,,,-0.0027207204837296217,-0.005733924986053518,0.009375000000000022

@@ -1,0 +1,49 @@
+{
+  "errors": [],
+  "exists": true,
+  "path": "data/fixtures/team_injuries_historical_backfill_2014_2018_2022.csv",
+  "summary": {
+    "columns": 26,
+    "observed_years": [
+      2014,
+      2018,
+      2022
+    ],
+    "preferred_columns_missing": [
+      "player_market_value_eur",
+      "tournament_year"
+    ],
+    "preferred_columns_present": [
+      "absence_reason",
+      "expected_return_date",
+      "in_final_squad",
+      "in_preliminary_squad",
+      "injury_start_date",
+      "match_date",
+      "player_name",
+      "position",
+      "ruled_out",
+      "source_name",
+      "source_published_at",
+      "source_url",
+      "team",
+      "tournament_year"
+    ],
+    "records_by_year": {
+      "2014": 14,
+      "2018": 12,
+      "2022": 12
+    },
+    "rows": 38,
+    "teams_by_year": {
+      "2014": 11,
+      "2018": 9,
+      "2022": 9
+    }
+  },
+  "usable": true,
+  "warnings": [
+    "Missing preferred columns: player_market_value_eur, tournament_year",
+    "Rows with non-standard boolean in_preliminary_squad: 14"
+  ]
+}
