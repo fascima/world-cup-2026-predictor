@@ -69,16 +69,6 @@ MODEL_ROWS = [
         "Takeaway": "Useful for score and draw reasoning.",
     },
     {
-        "Name": "Bayesian Goal Model",
-        "Kept Model": "Bayesian-style goal model",
-        "Architecture": "Regularized attack/defense goal model",
-        "Scope": "2022+",
-        "Log Loss": 0.9720,
-        "Accuracy": 0.5403,
-        "Brier": 0.5777,
-        "Takeaway": "Good diagnostic lens, weaker overall.",
-    },
-    {
         "Name": "Market-Adjusted WC Elo Model",
         "Kept Model": "WC Elo + market value",
         "Architecture": "World Cup rating model with squad value",
@@ -130,13 +120,6 @@ MODEL_DESCRIPTIONS = {
             "adjustment can shift low-score outcomes, which is useful for reasoning about draws."
         ),
     },
-    "Bayesian Goal Model": {
-        "summary": "A regularized attack/defense model that estimates team scoring strength and defensive weakness.",
-        "how": (
-            "This is a Bayesian-style empirical approach rather than a full MCMC model. It shrinks attack and defense "
-            "effects toward reasonable priors so teams with limited data do not get extreme estimates."
-        ),
-    },
     "Market-Adjusted WC Elo Model": {
         "summary": "A World Cup-only Elo variant that adjusts team strength using squad market value.",
         "how": (
@@ -160,7 +143,6 @@ MODEL_2026_OUTPUTS = {
     "Poisson Goal Model": "poisson_goal",
     "Gradient Boosting Model": "gradient_boosting",
     "Regression Model": "regression",
-    "Bayesian Goal Model": "bayesian_goal",
     "Market-Adjusted WC Elo Model": "market_adjusted_wc_elo",
 }
 
@@ -185,6 +167,16 @@ def safe_read_csv(path: str) -> pd.DataFrame:
     if not full_path.exists():
         return pd.DataFrame()
     return read_csv(path)
+
+
+def safe_read_live_csv(path: str) -> pd.DataFrame:
+    full_path = ROOT / path
+    if not full_path.exists():
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(full_path)
+    except pd.errors.EmptyDataError:
+        return pd.DataFrame()
 
 
 def safe_read_json(path: str) -> dict[str, Any]:
@@ -365,6 +357,83 @@ def render_model_descriptions() -> None:
             cols[1].markdown(f"**How it works:** {description['how']}")
 
     st.info("Feature sources: " + " ".join(FEATURE_NOTES))
+
+
+def format_kickoff(value: object) -> str:
+    timestamp = pd.to_datetime(value, utc=True, errors="coerce")
+    if pd.isna(timestamp):
+        return "Kickoff TBD"
+    local = timestamp.tz_convert("America/New_York")
+    return local.strftime("%b %-d, %-I:%M %p ET")
+
+
+def render_todays_matches() -> None:
+    st.header("Today's Matches")
+    predictions = safe_read_live_csv("results/todays_match_predictions.csv")
+    if predictions.empty:
+        st.info(
+            "No saved predictions for today's matches yet. Run `python scripts/update_world_cup_live_data.py` "
+            "after setting `FOOTBALL_DATA_API_KEY`."
+        )
+        return
+
+    probability_columns = [
+        "team_a_win_prob",
+        "draw_prob",
+        "team_b_win_prob",
+        "team_a_advancement_prob",
+        "team_b_advancement_prob",
+    ]
+    for column in probability_columns:
+        if column in predictions.columns:
+            predictions[column] = pd.to_numeric(predictions[column], errors="coerce")
+
+    match_columns = ["match_id", "kickoff_utc", "status", "stage", "group", "team_a", "team_b"]
+    matches = predictions[match_columns].drop_duplicates().sort_values(["kickoff_utc", "match_id"])
+    for match in matches.itertuples(index=False):
+        match_predictions = predictions[predictions["match_id"].astype(str).eq(str(match.match_id))].copy()
+        team_a = str(match.team_a)
+        team_b = str(match.team_b)
+        with st.container(border=True):
+            title_col, status_col = st.columns([3, 1])
+            title_col.subheader(f"{team_a} vs {team_b}")
+            status_col.caption(str(match.status or "Scheduled"))
+            st.caption(
+                " · ".join(
+                    item
+                    for item in [
+                        format_kickoff(match.kickoff_utc),
+                        str(match.stage or ""),
+                        str(match.group or ""),
+                    ]
+                    if item
+                )
+            )
+
+            display = match_predictions[
+                [
+                    "model",
+                    "team_a_win_prob",
+                    "draw_prob",
+                    "team_b_win_prob",
+                    "team_a_advancement_prob",
+                    "team_b_advancement_prob",
+                ]
+            ].copy()
+            display = display.rename(
+                columns={
+                    "model": "Model",
+                    "team_a_win_prob": f"{team_a} Win",
+                    "draw_prob": "Draw",
+                    "team_b_win_prob": f"{team_b} Win",
+                    "team_a_advancement_prob": f"{team_a} Advance",
+                    "team_b_advancement_prob": f"{team_b} Advance",
+                }
+            )
+            for column in display.columns:
+                if column != "Model":
+                    display[column] = display[column].map(lambda value: "" if pd.isna(value) else pct(float(value)))
+            st.dataframe(display, width="stretch", hide_index=True)
 
 
 def final_from_temp_snapshot() -> dict[str, Any] | None:
@@ -566,7 +635,6 @@ def render_model_2026_graphics() -> str:
             "Poisson Goal Model",
             "Gradient Boosting Model",
             "Regression Model",
-            "Bayesian Goal Model",
             "Market-Adjusted WC Elo Model",
         ],
     )
@@ -941,7 +1009,6 @@ def render_2022_snapshot() -> None:
         ("Gradient Boosting Model", 1.0064, 0.5469, 0.5989),
         ("Blended Model", 0.9931, 0.5000, 0.5884),
         ("Poisson Goal Model", 1.2111, 0.5000, 0.6636),
-        ("Bayesian Goal Model", 1.0101, 0.5469, 0.5933),
         ("Elo Model", 1.1006, 0.5313, 0.6363),
     ]
     df = pd.DataFrame(wc_rows, columns=["Model", "Log Loss", "Accuracy", "Brier"])
@@ -979,6 +1046,9 @@ def render_2022_snapshot() -> None:
 def render_data_sources() -> None:
     st.header("Data Sources Used By The Dashboard")
     rows = [
+        ("Today's match predictions", "results/todays_match_predictions.csv"),
+        ("Live World Cup match cache", "data/live/world_cup_matches.csv"),
+        ("Historical plus live results", "data/live/results_with_live_world_cup.csv"),
         ("Model summary", "Hard-coded recap from latest saved backtests"),
         ("Current 2026 bracket", "results/temp_2026_world_cup_current_model_predictions.csv"),
         ("Poisson deterministic bracket", "results/deterministic_poisson_bracket.json"),
@@ -1160,16 +1230,19 @@ def main() -> None:
 
     tabs = st.tabs(
         [
+            "Today's Matches",
             "Model Comparison",
             "Model Guide",
             "2026 Predictions",
         ]
     )
     with tabs[0]:
-        render_model_comparison()
+        render_todays_matches()
     with tabs[1]:
-        render_model_descriptions()
+        render_model_comparison()
     with tabs[2]:
+        render_model_descriptions()
+    with tabs[3]:
         render_2026_predictions()
 
 

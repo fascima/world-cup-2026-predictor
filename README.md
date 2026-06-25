@@ -65,6 +65,15 @@ python3 backtest.py
 
 The backtest scores predictions from `BACKTEST_START_YEAR` onward after using earlier matches to warm up ratings.
 
+Refresh live World Cup fixtures, completed results, current Elo ratings, and today's dashboard predictions:
+
+```bash
+export FOOTBALL_DATA_API_KEY=your_api_key_here
+python3 scripts/update_world_cup_live_data.py
+```
+
+The updater uses football-data.org's World Cup match endpoint, caches match data under `data/live/`, writes a historical-plus-live results file, updates current Elo/model ratings from completed matches, and writes `results/todays_match_predictions.csv` for the dashboard.
+
 Run the historical World Cup market-value backtest:
 
 ```bash

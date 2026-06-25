@@ -24,12 +24,6 @@ import numpy as np
 import pandas as pd
 
 from src import config
-from src.bayesian_goal_model import (
-    _apply_market_sanity_correction,
-    _draw_decision_predictions,
-    _outcome_probs_from_lambdas,
-    _predict_goal_rates,
-)
 from src.bracket import (
     FINAL_MATCH,
     QUARTERFINAL_MATCHES,
@@ -52,7 +46,6 @@ GROUPS_PATH = Path("data/fixtures/world_cup_2026_groups.csv")
 FEATURES_PATH = Path("data/processed/ml_match_features.csv")
 LOGISTIC_MODEL_PATH = Path("models/logistic_match_outcome.joblib")
 GRADIENT_BOOSTING_MODEL_PATH = Path("models/gradient_boosting_match_outcome.joblib")
-BAYESIAN_GOAL_MODEL_PATH = Path("models/bayesian_goal_model.joblib")
 MODEL_RATINGS_PATH = Path("results/world_cup_team_model_ratings.csv")
 OUTPUT_DIR = Path("results")
 
@@ -63,7 +56,6 @@ DEFAULT_MODEL_KEYS = [
     "regression",
     "gradient_boosting",
     "blended",
-    "bayesian_goal",
     "market_adjusted_wc_elo",
 ]
 
@@ -296,59 +288,6 @@ def _make_blend_predictor(logistic: ModelPredictor, gradient_boosting: ModelPred
                 predictor._cache[(team_a, team_b, phase)] = predict_fn(team_a, team_b, phase)
 
     predictor = ModelPredictor("blended", predict_fn)
-    predictor._precompute_fn = precompute_fn
-    return predictor
-
-
-def _make_bayesian_predictor(model, features: pd.DataFrame, ratings: dict[str, float]) -> ModelPredictor:
-    numeric_columns, categorical_columns = _required_model_columns(model)
-    defaults = _feature_defaults(features, numeric_columns + categorical_columns)
-
-    def predict_fn(team_a: str, team_b: str, phase: str) -> Prediction:
-        row = _ml_feature_row(defaults, team_a, team_b, phase, ratings)
-        row["date"] = pd.Timestamp("2026-06-11")
-        row["team_a"] = team_a
-        row["team_b"] = team_b
-        row["tournament"] = "FIFA World Cup"
-        row["neutral"] = True
-        row["target"] = 0
-        row["team_a_score"] = 0
-        row["team_b_score"] = 0
-        team_a_lambda, team_b_lambda = _predict_goal_rates(model, row)
-        probs = _outcome_probs_from_lambdas(team_a_lambda, team_b_lambda, draw_multiplier=0.85)
-        probs = _apply_market_sanity_correction(row, probs)
-        _ = _draw_decision_predictions(probs, threshold=0.26, max_win_gap=0.02)
-        return Prediction(float(probs[0, 0]), float(probs[0, 1]), float(probs[0, 2]))
-
-    def precompute_fn(teams: list[str]) -> None:
-        pairs = [(team_a, team_b) for team_a in teams for team_b in teams if team_a != team_b]
-        for phase in ["group", "knockout"]:
-            rows = []
-            for team_a, team_b in pairs:
-                row = _ml_feature_row(defaults, team_a, team_b, phase, ratings).iloc[0].to_dict()
-                row.update(
-                    {
-                        "date": pd.Timestamp("2026-06-11"),
-                        "team_a": team_a,
-                        "team_b": team_b,
-                        "tournament": "FIFA World Cup",
-                        "neutral": True,
-                        "target": 0,
-                        "team_a_score": 0,
-                        "team_b_score": 0,
-                    }
-                )
-                rows.append(row)
-            frame = pd.DataFrame(rows).reset_index(drop=True)
-            team_a_lambda, team_b_lambda = _predict_goal_rates(model, frame)
-            probs = _outcome_probs_from_lambdas(team_a_lambda, team_b_lambda, draw_multiplier=0.85)
-            probs = _apply_market_sanity_correction(frame, probs)
-            for (team_a, team_b), row_probs in zip(pairs, probs, strict=False):
-                predictor._cache[(team_a, team_b, phase)] = Prediction(
-                    float(row_probs[0]), float(row_probs[1]), float(row_probs[2])
-                )
-
-    predictor = ModelPredictor("bayesian_goal", predict_fn)
     predictor._precompute_fn = precompute_fn
     return predictor
 
@@ -755,7 +694,6 @@ def build_predictors() -> dict[str, ModelPredictor]:
 
     logistic_model = joblib.load(LOGISTIC_MODEL_PATH)
     gradient_boosting_model = joblib.load(GRADIENT_BOOSTING_MODEL_PATH)
-    bayesian_model = joblib.load(BAYESIAN_GOAL_MODEL_PATH)
 
     logistic = _make_ml_predictor("regression", logistic_model, features, ratings)
     gradient_boosting = _make_ml_predictor("gradient_boosting", gradient_boosting_model, features, ratings)
@@ -763,7 +701,6 @@ def build_predictors() -> dict[str, ModelPredictor]:
         "regression": logistic,
         "gradient_boosting": gradient_boosting,
         "blended": _make_blend_predictor(logistic, gradient_boosting),
-        "bayesian_goal": _make_bayesian_predictor(bayesian_model, features, ratings),
         "market_adjusted_wc_elo": _make_market_adjusted_elo_predictor(_market_rating_lookup(ratings), draw_model),
     }
 
