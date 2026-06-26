@@ -16,10 +16,11 @@ venv/
 
 # Large external/raw downloaded datasets
 data/external/
+data/live/
 
 # Generated heavyweight experiment outputs not needed by the Streamlit app
 results/elo_match_predictions.csv
 results/poisson_backtest_predictions.csv
 results/enhanced_dixon_coles_predictions.csv
 results/postprocess_experiment_predictions.csv
-
+results/todays_match_predictions.csv

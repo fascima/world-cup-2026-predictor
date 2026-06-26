@@ -72,7 +72,9 @@ export FOOTBALL_DATA_API_KEY=your_api_key_here
 python3 scripts/update_world_cup_live_data.py
 ```
 
-The updater uses football-data.org's World Cup match endpoint, caches match data under `data/live/`, writes a historical-plus-live results file, updates current Elo/model ratings from completed matches, and writes `results/todays_match_predictions.csv` for the dashboard.
+The dashboard also runs this refresh automatically when `FOOTBALL_DATA_API_KEY` is available in the environment. Streamlit caches the refresh for 15 minutes so normal page reruns do not spam the API. Automatic updates stop after the World Cup final date, `2026-07-19`.
+
+The updater uses football-data.org's World Cup match endpoint, caches match data under `data/live/`, writes a historical-plus-live results file, updates current Elo/model ratings from completed matches, and writes `results/todays_match_predictions.csv` for the dashboard. The live cache and today's generated prediction file are intentionally ignored by Git.
 
 Run the historical World Cup market-value backtest:
 

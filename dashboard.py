@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+from datetime import date
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -12,9 +14,12 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
+from src.live_update import WORLD_CUP_FINAL_DATE, refresh_live_outputs, world_cup_updates_are_active
+
 
 ROOT = Path(__file__).resolve().parent
 RESULTS = ROOT / "results"
+AUTO_REFRESH_TTL_SECONDS = 15 * 60
 
 
 MODEL_ROWS = [
@@ -184,6 +189,26 @@ def safe_read_json(path: str) -> dict[str, Any]:
     if not full_path.exists():
         return {}
     return read_json(path)
+
+
+@st.cache_data(ttl=AUTO_REFRESH_TTL_SECONDS, show_spinner=False)
+def auto_refresh_live_outputs(today_iso: str) -> dict[str, Any]:
+    """Refresh live data once per cache window while the tournament is active."""
+    today = date.fromisoformat(today_iso)
+    if not world_cup_updates_are_active(today):
+        return {
+            "status": "inactive",
+            "message": f"Automatic updates stopped after {WORLD_CUP_FINAL_DATE.isoformat()}.",
+        }
+    if not os.environ.get("FOOTBALL_DATA_API_KEY"):
+        return {
+            "status": "missing_key",
+            "message": "Set FOOTBALL_DATA_API_KEY to enable automatic match updates.",
+        }
+    try:
+        return refresh_live_outputs(today=today)
+    except Exception as exc:  # noqa: BLE001 - surface API/update failures in the dashboard.
+        return {"status": "error", "message": str(exc)}
 
 
 def model_table() -> pd.DataFrame:
@@ -367,13 +392,54 @@ def format_kickoff(value: object) -> str:
     return local.strftime("%b %-d, %-I:%M %p ET")
 
 
+def is_knockout_stage(stage: object) -> bool:
+    text = str(stage or "").upper()
+    return bool(text and "GROUP" not in text)
+
+
+def probability_value(value: object) -> float:
+    numeric = pd.to_numeric(value, errors="coerce")
+    if pd.isna(numeric):
+        return 0.0
+    return max(0.0, min(1.0, float(numeric)))
+
+
+def top_outcome(row: pd.Series, team_a: str, team_b: str) -> str:
+    outcomes = {
+        f"{team_a} win": probability_value(row.get("team_a_win_prob")),
+        "Draw": probability_value(row.get("draw_prob")),
+        f"{team_b} win": probability_value(row.get("team_b_win_prob")),
+    }
+    return max(outcomes.items(), key=lambda item: item[1])[0]
+
+
+def render_probability_bar(value: object) -> None:
+    probability = probability_value(value)
+    st.progress(probability, text=pct(probability))
+
+
 def render_todays_matches() -> None:
     st.header("Today's Matches")
+    today_iso = date.today().isoformat()
+    with st.spinner("Refreshing live match data..."):
+        refresh_status = auto_refresh_live_outputs(today_iso)
+    if refresh_status.get("status") == "updated":
+        st.caption(
+            f"Auto-updated from football-data.org. Cached matches: {refresh_status.get('matches', 0)}. "
+            f"Prediction rows: {refresh_status.get('predictions', 0)}."
+        )
+    elif refresh_status.get("status") == "missing_key":
+        st.info(str(refresh_status["message"]))
+    elif refresh_status.get("status") == "inactive":
+        st.caption(str(refresh_status["message"]))
+    elif refresh_status.get("status") == "error":
+        st.warning(f"Automatic update failed: {refresh_status['message']}")
+
     predictions = safe_read_live_csv("results/todays_match_predictions.csv")
     if predictions.empty:
         st.info(
-            "No saved predictions for today's matches yet. Run `python scripts/update_world_cup_live_data.py` "
-            "after setting `FOOTBALL_DATA_API_KEY`."
+            "No saved predictions for today's matches yet. Set `FOOTBALL_DATA_API_KEY` and refresh the app, "
+            "or run `python scripts/update_world_cup_live_data.py`."
         )
         return
 
@@ -394,6 +460,7 @@ def render_todays_matches() -> None:
         match_predictions = predictions[predictions["match_id"].astype(str).eq(str(match.match_id))].copy()
         team_a = str(match.team_a)
         team_b = str(match.team_b)
+        show_advancement = is_knockout_stage(match.stage)
         with st.container(border=True):
             title_col, status_col = st.columns([3, 1])
             title_col.subheader(f"{team_a} vs {team_b}")
@@ -410,30 +477,42 @@ def render_todays_matches() -> None:
                 )
             )
 
-            display = match_predictions[
-                [
-                    "model",
-                    "team_a_win_prob",
-                    "draw_prob",
-                    "team_b_win_prob",
-                    "team_a_advancement_prob",
-                    "team_b_advancement_prob",
+            if show_advancement:
+                header_weights = [1.35, 1, 1, 1, 1, 1]
+                header_labels = [
+                    "Model",
+                    f"{team_a} win",
+                    "Draw",
+                    f"{team_b} win",
+                    f"{team_a} advances",
+                    f"{team_b} advances",
                 ]
-            ].copy()
-            display = display.rename(
-                columns={
-                    "model": "Model",
-                    "team_a_win_prob": f"{team_a} Win",
-                    "draw_prob": "Draw",
-                    "team_b_win_prob": f"{team_b} Win",
-                    "team_a_advancement_prob": f"{team_a} Advance",
-                    "team_b_advancement_prob": f"{team_b} Advance",
-                }
-            )
-            for column in display.columns:
-                if column != "Model":
-                    display[column] = display[column].map(lambda value: "" if pd.isna(value) else pct(float(value)))
-            st.dataframe(display, width="stretch", hide_index=True)
+            else:
+                header_weights = [1.35, 1, 1, 1]
+                header_labels = ["Model", f"{team_a} win", "Draw", f"{team_b} win"]
+
+            header_cols = st.columns(header_weights)
+            for col, label in zip(header_cols, header_labels, strict=False):
+                col.markdown(f"**{label}**")
+
+            for index, row in enumerate(match_predictions.itertuples(index=False)):
+                row_series = pd.Series(row._asdict())
+                cols = st.columns(header_weights)
+                cols[0].markdown(f"**{row_series.get('model', 'Model')}**")
+                cols[0].caption(f"Top: {top_outcome(row_series, team_a, team_b)}")
+                with cols[1]:
+                    render_probability_bar(row_series.get("team_a_win_prob"))
+                with cols[2]:
+                    render_probability_bar(row_series.get("draw_prob"))
+                with cols[3]:
+                    render_probability_bar(row_series.get("team_b_win_prob"))
+                if show_advancement:
+                    with cols[4]:
+                        render_probability_bar(row_series.get("team_a_advancement_prob"))
+                    with cols[5]:
+                        render_probability_bar(row_series.get("team_b_advancement_prob"))
+                if index < len(match_predictions) - 1:
+                    st.divider()
 
 
 def final_from_temp_snapshot() -> dict[str, Any] | None:
