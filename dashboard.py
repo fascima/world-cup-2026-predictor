@@ -191,6 +191,20 @@ def safe_read_json(path: str) -> dict[str, Any]:
     return read_json(path)
 
 
+def football_data_api_key() -> str:
+    """Return the football-data.org API key from env vars or Streamlit secrets."""
+    token = os.environ.get("FOOTBALL_DATA_API_KEY", "")
+    if token:
+        return token
+    try:
+        token = str(st.secrets.get("FOOTBALL_DATA_API_KEY", ""))
+    except Exception:
+        token = ""
+    if token:
+        os.environ["FOOTBALL_DATA_API_KEY"] = token
+    return token
+
+
 @st.cache_data(ttl=AUTO_REFRESH_TTL_SECONDS, show_spinner=False)
 def auto_refresh_live_outputs(today_iso: str) -> dict[str, Any]:
     """Refresh live data once per cache window while the tournament is active."""
@@ -200,7 +214,7 @@ def auto_refresh_live_outputs(today_iso: str) -> dict[str, Any]:
             "status": "inactive",
             "message": f"Automatic updates stopped after {WORLD_CUP_FINAL_DATE.isoformat()}.",
         }
-    if not os.environ.get("FOOTBALL_DATA_API_KEY"):
+    if not football_data_api_key():
         return {
             "status": "missing_key",
             "message": "Set FOOTBALL_DATA_API_KEY to enable automatic match updates.",
@@ -437,10 +451,13 @@ def render_todays_matches() -> None:
 
     predictions = safe_read_live_csv("results/todays_match_predictions.csv")
     if predictions.empty:
+        cached_matches = safe_read_live_csv("data/live/world_cup_matches.csv")
+        cached_count = len(cached_matches) if not cached_matches.empty else 0
         st.info(
             "No saved predictions for today's matches yet. Set `FOOTBALL_DATA_API_KEY` and refresh the app, "
             "or run `python scripts/update_world_cup_live_data.py`."
         )
+        st.caption(f"App date: {today_iso}. Cached API matches: {cached_count}.")
         return
 
     probability_columns = [
