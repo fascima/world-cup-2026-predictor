@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.live_update import LIVE_RESULTS_PATH, refresh_live_outputs
+from src.live_world_cup import current_display_date
 
 
 def parse_args() -> argparse.Namespace:
@@ -24,7 +25,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    today = date.fromisoformat(args.today) if args.today else date.today()
+    today = date.fromisoformat(args.today) if args.today else current_display_date()
     summary = refresh_live_outputs(
         days_back=args.days_back,
         days_forward=args.days_forward,

@@ -15,6 +15,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from src.live_update import WORLD_CUP_FINAL_DATE, refresh_live_outputs, world_cup_updates_are_active
+from src.live_world_cup import current_display_date
 
 
 ROOT = Path(__file__).resolve().parent
@@ -434,7 +435,7 @@ def render_probability_bar(value: object) -> None:
 
 def render_todays_matches() -> None:
     st.header("Today's Matches")
-    today_iso = date.today().isoformat()
+    today_iso = current_display_date().isoformat()
     with st.spinner("Refreshing live match data..."):
         refresh_status = auto_refresh_live_outputs(today_iso)
     if refresh_status.get("status") == "updated":

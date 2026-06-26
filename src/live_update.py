@@ -10,7 +10,12 @@ import pandas as pd
 from main import GROUPS_PATH, MARKET_VALUES_PATH, MODEL_RATINGS_PATH
 from src.data_loader import clean_results, load_results
 from src.elo import build_elo_history, save_elo_ratings
-from src.live_world_cup import LIVE_RESULTS_PATH, refresh_cached_matches, write_results_with_live_matches
+from src.live_world_cup import (
+    LIVE_RESULTS_PATH,
+    current_display_date,
+    refresh_cached_matches,
+    write_results_with_live_matches,
+)
 from src.market_value import apply_market_value_adjustments, load_market_values
 from src.simulate import load_groups
 from src.todays_predictions import build_todays_predictions
@@ -22,7 +27,7 @@ WORLD_CUP_FINAL_DATE = date(2026, 7, 19)
 
 def world_cup_updates_are_active(today: date | None = None) -> bool:
     """Return True while automated World Cup refreshes should run."""
-    return (today or date.today()) <= WORLD_CUP_FINAL_DATE
+    return (today or current_display_date()) <= WORLD_CUP_FINAL_DATE
 
 
 def _world_cup_teams() -> set[str]:
@@ -57,7 +62,7 @@ def refresh_live_outputs(
     today: date | None = None,
 ) -> dict[str, int | str]:
     """Refresh live fixtures/results, ratings, and today's prediction file."""
-    anchor = today or date.today()
+    anchor = today or current_display_date()
     if not world_cup_updates_are_active(anchor):
         return {
             "status": "inactive",

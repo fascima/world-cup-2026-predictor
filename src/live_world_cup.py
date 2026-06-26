@@ -10,6 +10,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -17,6 +18,7 @@ import pandas as pd
 FOOTBALL_DATA_BASE_URL = "https://api.football-data.org/v4"
 DEFAULT_COMPETITION = "WC"
 DEFAULT_SEASON = 2026
+DISPLAY_TIMEZONE = ZoneInfo("America/New_York")
 LIVE_DATA_DIR = Path("data/live")
 LIVE_MATCHES_PATH = LIVE_DATA_DIR / "world_cup_matches.csv"
 LIVE_RESULTS_PATH = LIVE_DATA_DIR / "results_with_live_world_cup.csv"
@@ -38,6 +40,11 @@ TEAM_NAME_ALIASES = {
 FINISHED_STATUSES = {"FINISHED", "AWARDED"}
 
 
+def current_display_date() -> date:
+    """Return today's date in the dashboard's match-display timezone."""
+    return datetime.now(DISPLAY_TIMEZONE).date()
+
+
 def normalize_team_name(name: object) -> str:
     """Return the repo's preferred team name for an API team value."""
     text = "" if pd.isna(name) else str(name).strip()
@@ -49,7 +56,7 @@ def local_date_from_utc(value: object) -> str:
     timestamp = pd.to_datetime(value, utc=True, errors="coerce")
     if pd.isna(timestamp):
         return ""
-    return timestamp.tz_convert("America/New_York").date().isoformat()
+    return timestamp.tz_convert(DISPLAY_TIMEZONE).date().isoformat()
 
 
 def _team_name(team: dict[str, Any] | None) -> str:
@@ -162,7 +169,7 @@ def refresh_cached_matches(
     today: date | None = None,
 ) -> pd.DataFrame:
     """Fetch a rolling World Cup window and merge it into the local cache."""
-    anchor = today or date.today()
+    anchor = today or current_display_date()
     incoming = fetch_world_cup_matches(
         date_from=anchor - timedelta(days=days_back),
         date_to=anchor + timedelta(days=days_forward),
@@ -176,7 +183,7 @@ def todays_matches(matches: pd.DataFrame, today: date | str | None = None) -> pd
     """Return matches scheduled for the requested local date."""
     if matches.empty or "local_date" not in matches.columns:
         return pd.DataFrame()
-    target = str(today or date.today())
+    target = str(today or current_display_date())
     return matches[matches["local_date"].astype(str).eq(target)].copy()
 
 
