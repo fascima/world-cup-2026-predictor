@@ -7,9 +7,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.bracket_challenge import refresh_bracket_challenge_outputs
 from main import GROUPS_PATH, MARKET_VALUES_PATH, MODEL_RATINGS_PATH
 from src.data_loader import clean_results, load_results
 from src.elo import build_elo_history, save_elo_ratings
+from src.live_evaluation import refresh_live_metrics
 from src.live_world_cup import (
     LIVE_RESULTS_PATH,
     current_display_date,
@@ -18,7 +20,12 @@ from src.live_world_cup import (
 )
 from src.market_value import apply_market_value_adjustments, load_market_values
 from src.simulate import load_groups
-from src.todays_predictions import build_todays_predictions
+from src.todays_predictions import (
+    build_cached_match_backfill_predictions,
+    build_todays_poisson_score_predictions,
+    build_todays_predictions,
+    build_upcoming_match_predictions,
+)
 
 
 ELO_RATINGS_PATH = Path("results/current_elo_ratings.csv")
@@ -77,10 +84,22 @@ def refresh_live_outputs(
     combined = write_results_with_live_matches(matches=matches)
     ratings = rebuild_live_elo_state()
     predictions = build_todays_predictions(matches=matches, today=anchor)
+    poisson_scores = build_todays_poisson_score_predictions(matches=matches, today=anchor)
+    upcoming_predictions = build_upcoming_match_predictions(matches=matches, today=anchor)
+    backfill_predictions = build_cached_match_backfill_predictions(matches=matches)
+    metrics = refresh_live_metrics(matches=matches)
+    bracket_challenge = refresh_bracket_challenge_outputs(matches=matches)
     return {
         "status": "updated",
         "matches": len(matches),
         "results": len(combined),
         "ratings": len(ratings),
         "predictions": len(predictions),
+        "poisson_score_predictions": len(poisson_scores),
+        "upcoming_predictions": len(upcoming_predictions),
+        "backfill_predictions": len(backfill_predictions),
+        "ledger_rows": metrics["ledger_rows"],
+        "backfill_rows": metrics["backfill_rows"],
+        "evaluated_predictions": metrics["evaluated_rows"],
+        "bracket_picks": bracket_challenge["pick_rows"],
     }

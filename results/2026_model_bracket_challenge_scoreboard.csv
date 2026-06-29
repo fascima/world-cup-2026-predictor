@@ -1,0 +1,6 @@
+rank,model_key,model,weighted_log_loss,average_log_loss,max_points,possible_points,evaluated_picks,correct_picks,wrong_picks
+1,market_adjusted_wc_elo,Market-Adjusted WC Elo Model,0.5059729709207661,0.25298648546038305,80,78,2,2,0
+2,elo,Elo Model,0.6194035637688098,0.3097017818844049,80,78,2,2,0
+3,regression,Regression Model,0.803373293077494,0.401686646538747,80,78,2,2,0
+4,blended,Blended Model,0.8803962509799281,0.44019812548996406,80,78,2,2,0
+5,gradient_boosting,Gradient Boosting Model,1.0319172021271652,0.5159586010635826,80,78,2,2,0

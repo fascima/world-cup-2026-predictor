@@ -16,6 +16,7 @@ import streamlit.components.v1 as components
 
 from src.live_update import WORLD_CUP_FINAL_DATE, refresh_live_outputs, world_cup_updates_are_active
 from src.live_world_cup import current_display_date
+from src.bracket_challenge import ROUND_POINTS
 
 
 ROOT = Path(__file__).resolve().parent
@@ -433,6 +434,40 @@ def render_probability_bar(value: object) -> None:
     st.progress(probability, text=pct(probability))
 
 
+def score_probability(row: pd.Series, index: int) -> float:
+    return probability_value(row.get(f"scoreline_{index}_prob"))
+
+
+def render_poisson_score_forecast(forecast: pd.Series | None, team_a: str, team_b: str) -> None:
+    if forecast is None or forecast.empty:
+        return
+
+    scorelines: list[tuple[int, str, float]] = []
+    for index in range(1, 4):
+        scoreline = str(forecast.get(f"scoreline_{index}", "") or "").strip()
+        if not scoreline:
+            continue
+        scorelines.append((index, scoreline, score_probability(forecast, index)))
+    if not scorelines:
+        return
+
+    team_a_xg = pd.to_numeric(forecast.get("team_a_expected_goals"), errors="coerce")
+    team_b_xg = pd.to_numeric(forecast.get("team_b_expected_goals"), errors="coerce")
+    st.markdown("**Poisson Goal Model Score Forecast**")
+    st.caption("This scoreline view comes only from the Poisson goal model, separate from the other outcome models.")
+    if pd.notna(team_a_xg) and pd.notna(team_b_xg):
+        st.caption(
+            f"Expected goals: {team_a} {float(team_a_xg):.2f} | {team_b} {float(team_b_xg):.2f}"
+        )
+
+    cols = st.columns(3)
+    for column, (rank, scoreline, probability) in zip(cols, scorelines, strict=False):
+        with column.container(border=True):
+            st.caption(f"#{rank} scoreline")
+            st.markdown(f"**{scoreline}**")
+            st.caption(pct(probability))
+
+
 def render_todays_matches() -> None:
     st.header("Today's Matches")
     today_iso = current_display_date().isoformat()
@@ -441,7 +476,9 @@ def render_todays_matches() -> None:
     if refresh_status.get("status") == "updated":
         st.caption(
             f"Auto-updated from football-data.org. Cached matches: {refresh_status.get('matches', 0)}. "
-            f"Prediction rows: {refresh_status.get('predictions', 0)}."
+            f"Prediction rows: {refresh_status.get('predictions', 0)}. "
+            f"Score forecasts: {refresh_status.get('poisson_score_predictions', 0)}. "
+            f"Ledger rows: {refresh_status.get('ledger_rows', 0)}."
         )
     elif refresh_status.get("status") == "missing_key":
         st.info(str(refresh_status["message"]))
@@ -451,14 +488,25 @@ def render_todays_matches() -> None:
         st.warning(f"Automatic update failed: {refresh_status['message']}")
 
     predictions = safe_read_live_csv("results/todays_match_predictions.csv")
+    if not predictions.empty and "local_date" in predictions.columns:
+        saved_dates = sorted(predictions["local_date"].dropna().astype(str).unique().tolist())
+        predictions = predictions[predictions["local_date"].astype(str).eq(today_iso)].copy()
+    else:
+        saved_dates = []
     if predictions.empty:
         cached_matches = safe_read_live_csv("data/live/world_cup_matches.csv")
         cached_count = len(cached_matches) if not cached_matches.empty else 0
-        st.info(
-            "No saved predictions for today's matches yet. Set `FOOTBALL_DATA_API_KEY` and refresh the app, "
-            "or run `python scripts/update_world_cup_live_data.py`."
+        todays_cached = (
+            cached_matches[cached_matches["local_date"].astype(str).eq(today_iso)]
+            if not cached_matches.empty and "local_date" in cached_matches.columns
+            else pd.DataFrame()
         )
-        st.caption(f"App date: {today_iso}. Cached API matches: {cached_count}.")
+        st.info(
+            "No saved predictions for today's matches yet. Live updates need a configured football-data.org API key."
+        )
+        if saved_dates:
+            st.caption(f"App date: {today_iso}. Saved prediction dates: {', '.join(saved_dates)}.")
+        st.caption(f"Cached API matches: {cached_count}. Cached matches today: {len(todays_cached)}.")
         return
 
     probability_columns = [
@@ -471,6 +519,14 @@ def render_todays_matches() -> None:
     for column in probability_columns:
         if column in predictions.columns:
             predictions[column] = pd.to_numeric(predictions[column], errors="coerce")
+
+    poisson_scores = safe_read_live_csv("results/todays_poisson_score_predictions.csv")
+    if not poisson_scores.empty and "local_date" in poisson_scores.columns:
+        poisson_scores = poisson_scores[poisson_scores["local_date"].astype(str).eq(today_iso)].copy()
+    score_lookup: dict[str, pd.Series] = {}
+    if not poisson_scores.empty and "match_id" in poisson_scores.columns:
+        for _, row in poisson_scores.iterrows():
+            score_lookup[str(row.get("match_id", ""))] = row
 
     match_columns = ["match_id", "kickoff_utc", "status", "stage", "group", "team_a", "team_b"]
     matches = predictions[match_columns].drop_duplicates().sort_values(["kickoff_utc", "match_id"])
@@ -531,6 +587,8 @@ def render_todays_matches() -> None:
                         render_probability_bar(row_series.get("team_b_advancement_prob"))
                 if index < len(match_predictions) - 1:
                     st.divider()
+            st.divider()
+            render_poisson_score_forecast(score_lookup.get(str(match.match_id)), team_a, team_b)
 
 
 def final_from_temp_snapshot() -> dict[str, Any] | None:
@@ -761,6 +819,504 @@ def render_2026_predictions() -> None:
     render_selected_model_bracket(selected_model)
 
 
+def render_live_model_accuracy() -> None:
+    st.header("Current Model Performance")
+    st.caption("Tournament-only results for completed 2026 World Cup matches.")
+
+    metrics = safe_read_live_csv("results/world_cup_2026_model_live_metrics.csv")
+    evaluation = safe_read_live_csv("results/world_cup_2026_model_match_evaluation.csv")
+
+    if metrics.empty:
+        st.info(
+            "No live tournament metrics have been written yet. Refresh live data from the Today's Matches page."
+        )
+        return
+
+    metrics = metrics.copy()
+    metrics["wrong_picks"] = pd.to_numeric(metrics["matches_evaluated"], errors="coerce").fillna(0) - pd.to_numeric(
+        metrics["correct_picks"], errors="coerce"
+    ).fillna(0)
+    metrics["wrong_picks"] = metrics["wrong_picks"].astype(int)
+    best_log_loss = metrics.loc[metrics["log_loss"].idxmin()]
+    best_accuracy = metrics.loc[metrics["accuracy"].idxmax()]
+    total_matches = int(metrics["matches_evaluated"].max()) if "matches_evaluated" in metrics else 0
+    col1, col2, col3 = st.columns(3)
+    col1.markdown(
+        model_metric_card("Lowest Live Log Loss", best_log_loss["model"], f"{best_log_loss['log_loss']:.4f}"),
+        unsafe_allow_html=True,
+    )
+    col2.markdown(
+        model_metric_card("Highest Live Accuracy", best_accuracy["model"], pct(float(best_accuracy["accuracy"]))),
+        unsafe_allow_html=True,
+    )
+    col3.markdown(
+        model_metric_card("Matches Played", "Completed Fixtures", str(total_matches)),
+        unsafe_allow_html=True,
+    )
+
+    display = metrics.copy()
+    display = display.rename(
+        columns={
+            "model": "Model",
+            "matches_evaluated": "Matches",
+            "correct_picks": "Correct",
+            "wrong_picks": "Wrong",
+            "accuracy": "Accuracy",
+            "log_loss": "Log Loss",
+            "brier": "Brier",
+        }
+    )
+    for column in ["Accuracy"]:
+        if column in display:
+            display[column] = pd.to_numeric(display[column], errors="coerce").map(pct)
+    for column in ["Log Loss", "Brier"]:
+        if column in display:
+            display[column] = pd.to_numeric(display[column], errors="coerce").map(lambda value: f"{value:.4f}")
+    st.subheader("Leaderboard")
+    st.dataframe(
+        display[["Model", "Matches", "Correct", "Wrong", "Accuracy", "Log Loss", "Brier"]],
+        width="stretch",
+        hide_index=True,
+    )
+
+    chart_df = metrics[["model", "accuracy", "log_loss", "brier"]].copy()
+    metric = st.radio("Live chart metric", ["log_loss", "accuracy", "brier"], horizontal=True)
+    sort_order = chart_df.sort_values(metric, ascending=metric != "accuracy")["model"].tolist()
+    chart = (
+        alt.Chart(chart_df)
+        .mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
+        .encode(
+            x=alt.X("model:N", sort=sort_order, title=None, axis=alt.Axis(labelAngle=-25)),
+            y=alt.Y(f"{metric}:Q", title=metric.replace("_", " "), axis=alt.Axis(format="%" if metric == "accuracy" else ".3f")),
+            color=alt.Color("model:N", legend=None, scale=alt.Scale(scheme="tableau20")),
+            tooltip=[
+                alt.Tooltip("model:N", title="Model"),
+                alt.Tooltip(f"{metric}:Q", title=metric.replace("_", " ").title(), format=".1%" if metric == "accuracy" else ".4f"),
+            ],
+        )
+        .properties(height=360)
+    )
+    st.altair_chart(chart, width="stretch")
+
+    render_match_prediction_review(evaluation)
+
+
+def readable_prediction_result(value: object, team_a: str, team_b: str) -> str:
+    result = str(value or "")
+    if result == "team_a_win":
+        return f"{team_a} win"
+    if result == "team_b_win":
+        return f"{team_b} win"
+    if result == "draw":
+        return "Draw"
+    return result.replace("_", " ").title()
+
+
+def render_match_prediction_review(evaluation: pd.DataFrame) -> None:
+    st.subheader("Match Review")
+    if evaluation.empty:
+        st.info("No completed match predictions are available yet.")
+        return
+
+    review = evaluation.copy()
+    review["kickoff_utc"] = pd.to_datetime(review["kickoff_utc"], utc=True, errors="coerce")
+    review = review.sort_values(["kickoff_utc", "match_id", "model"], ascending=[False, True, True])
+    model_options = ["All models"] + sorted(review["model"].dropna().astype(str).unique().tolist())
+    selected_model = st.selectbox("Model filter", model_options)
+    if selected_model != "All models":
+        review = review[review["model"].astype(str).eq(selected_model)].copy()
+
+    default_visible = 5
+    state_key = "performance_match_review_limit"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = default_visible
+
+    match_keys = (
+        review[["match_id", "kickoff_utc", "stage", "team_a", "team_b", "home_score", "away_score", "actual_result"]]
+        .drop_duplicates(subset=["match_id"])
+        .head(int(st.session_state[state_key]))
+    )
+    for match in match_keys.itertuples(index=False):
+        match_rows = review[review["match_id"].astype(str).eq(str(match.match_id))].copy()
+        if match_rows.empty:
+            continue
+
+        team_a = str(match.team_a)
+        team_b = str(match.team_b)
+        score = f"{int(match.home_score)}-{int(match.away_score)}"
+        actual = readable_prediction_result(match.actual_result, team_a, team_b)
+        kickoff = (
+            match.kickoff_utc.tz_convert("America/New_York").strftime("%b %-d")
+            if pd.notna(match.kickoff_utc)
+            else "Date TBD"
+        )
+        with st.container(border=True):
+            title_col, result_col = st.columns([2.2, 1])
+            title_col.markdown(f"**{team_a} vs {team_b}**")
+            title_col.caption(" · ".join(item for item in [kickoff, str(match.stage or "")] if item))
+            result_col.markdown(f"**{score}**")
+            result_col.caption(f"Actual: {actual}")
+
+            for row in match_rows.itertuples(index=False):
+                predicted = readable_prediction_result(row.predicted_result, team_a, team_b)
+                status = "Correct" if bool(row.correct) else "Wrong"
+                probability = pct(float(row.actual_probability))
+                loss = f"{float(row.log_loss):.3f}"
+                cols = st.columns([1.55, 1.4, 0.75, 0.9, 0.8])
+                cols[0].markdown(f"**{row.model}**")
+                cols[1].write(predicted)
+                cols[2].write(status)
+                cols[3].write(f"Actual prob {probability}")
+                cols[4].write(f"Loss {loss}")
+
+    total_matches = review["match_id"].nunique()
+    if int(st.session_state[state_key]) < total_matches:
+        if st.button("Show more matches"):
+            st.session_state[state_key] = int(st.session_state[state_key]) + 5
+            st.rerun()
+
+
+def render_bracket_challenge() -> None:
+    st.header("Bracket Challenge")
+    st.caption(
+        "These model brackets are ranked by round-weighted log loss instead of simple accuracy. "
+        "That matters because the brackets are very similar: log loss rewards models that assign higher probability "
+        "to the actual advancer and punishes overconfident misses. Lower score is better. Round weights are: "
+        + ", ".join(f"{round_name.replace('_', ' ').title()} {points}" for round_name, points in ROUND_POINTS.items())
+        + "."
+    )
+
+    scoreboard = safe_read_live_csv("results/2026_model_bracket_challenge_scoreboard.csv")
+    picks = safe_read_live_csv("results/2026_model_bracket_challenge_picks.csv")
+    if scoreboard.empty:
+        st.info(
+            "No actual knockout fixtures have model picks yet. Refresh live data once fixture teams are available."
+        )
+        return
+    else:
+        display = scoreboard.rename(
+            columns={
+                "rank": "Rank",
+                "model": "Model",
+                "weighted_log_loss": "Weighted Log Loss",
+                "average_log_loss": "Avg Log Loss",
+                "max_points": "Max Points",
+                "possible_points": "Possible Points",
+                "evaluated_picks": "Evaluated Picks",
+                "correct_picks": "Correct Picks",
+                "wrong_picks": "Wrong Picks",
+            }
+        )
+        for column in ["Weighted Log Loss", "Avg Log Loss"]:
+            if column in display:
+                display[column] = pd.to_numeric(display[column], errors="coerce").map(lambda value: f"{value:.4f}")
+        st.subheader("Leaderboard")
+        st.dataframe(
+            display[
+                [
+                    "Rank",
+                    "Model",
+                    "Weighted Log Loss",
+                    "Avg Log Loss",
+                    "Evaluated Picks",
+                    "Correct Picks",
+                    "Wrong Picks",
+                    "Possible Points",
+                ]
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+    if picks.empty:
+        return
+
+    st.subheader("Actual Fixture Picks")
+    picks = picks.copy()
+    picks["kickoff_utc"] = pd.to_datetime(picks["kickoff_utc"], utc=True, errors="coerce")
+    model_names = sorted(picks["model"].dropna().astype(str).unique().tolist())
+    selected_model = st.selectbox("Model", model_names, key="actual-fixture-model")
+    model_picks = picks[picks["model"].astype(str).eq(selected_model)].copy()
+    model_picks = model_picks.sort_values(["kickoff_utc", "match_id"], kind="mergesort")
+    render_actual_fixture_bracket(model_picks, selected_model)
+
+
+def render_actual_fixture_bracket(model_picks: pd.DataFrame, model_title: str) -> None:
+    if model_picks.empty:
+        st.info("No actual fixture picks are available for this model yet.")
+        return
+
+    rows_by_node: dict[str, object] = {}
+    for row in model_picks.itertuples(index=False):
+        round_name = str(row.round)
+        index = int(row.bracket_index)
+        if round_name == "round_of_32":
+            key = f"L32_{index}" if index < 8 else f"R32_{index - 8}"
+        elif round_name == "round_of_16":
+            key = f"L16_{index}" if index < 4 else f"R16_{index - 4}"
+        elif round_name == "quarterfinal":
+            key = f"LQF_{index}" if index < 2 else f"RQF_{index - 2}"
+        elif round_name == "semifinal":
+            key = "LSF_0" if index == 0 else "RSF_0"
+        elif round_name == "final":
+            key = "FINAL"
+        else:
+            continue
+        rows_by_node[key] = row
+
+    width = 1600
+    height = 960
+    box_width = 210
+    box_height = 62
+    top_y = 126
+    step = 100
+    center_x = 695
+    final_y = 386
+
+    def truncate(text: object, max_chars: int = 21) -> str:
+        value = str(text)
+        return value if len(value) <= max_chars else value[: max_chars - 1] + "…"
+
+    def fmt_kickoff(value: object) -> str:
+        timestamp = pd.to_datetime(value, utc=True, errors="coerce")
+        if pd.isna(timestamp):
+            return "TBD"
+        return timestamp.tz_convert("America/New_York").strftime("%b %-d")
+
+    positions: dict[str, tuple[float, float, float, float]] = {}
+    left_x = [20, 235, 450, 570]
+    right_x = [1370, 1155, 940, 820]
+
+    for index in range(8):
+        positions[f"L32_{index}"] = (left_x[0], top_y + index * step, box_width, box_height)
+        positions[f"R32_{index}"] = (right_x[0], top_y + index * step, box_width, box_height)
+    for index in range(4):
+        y = (positions[f"L32_{index * 2}"][1] + positions[f"L32_{index * 2 + 1}"][1]) / 2
+        positions[f"L16_{index}"] = (left_x[1], y, box_width, box_height)
+        y = (positions[f"R32_{index * 2}"][1] + positions[f"R32_{index * 2 + 1}"][1]) / 2
+        positions[f"R16_{index}"] = (right_x[1], y, box_width, box_height)
+    for index in range(2):
+        y = (positions[f"L16_{index * 2}"][1] + positions[f"L16_{index * 2 + 1}"][1]) / 2
+        positions[f"LQF_{index}"] = (left_x[2], y, box_width, box_height)
+        y = (positions[f"R16_{index * 2}"][1] + positions[f"R16_{index * 2 + 1}"][1]) / 2
+        positions[f"RQF_{index}"] = (right_x[2], y, box_width, box_height)
+    positions["LSF_0"] = (left_x[3], 476, box_width, box_height)
+    positions["RSF_0"] = (right_x[3], 476, box_width, box_height)
+    positions["FINAL"] = (center_x, final_y, box_width, box_height)
+
+    def connector(start: str, end: str) -> str:
+        if start not in positions or end not in positions:
+            return ""
+        x1, y1, w1, h1 = positions[start]
+        x2, y2, w2, h2 = positions[end]
+        left_side = x1 < center_x
+        start_x = x1 + w1 if left_side else x1
+        end_x = x2 if left_side else x2 + w2
+        start_y = y1 + h1 / 2
+        end_y = y2 + h2 / 2
+        mid_x = (start_x + end_x) / 2
+        return (
+            f'<path d="M {start_x:.1f} {start_y:.1f} '
+            f'L {mid_x:.1f} {start_y:.1f} '
+            f'L {mid_x:.1f} {end_y:.1f} '
+            f'L {end_x:.1f} {end_y:.1f}" />'
+        )
+
+    connector_pairs = []
+    for index in range(8):
+        connector_pairs.append((f"L32_{index}", f"L16_{index // 2}"))
+        connector_pairs.append((f"R32_{index}", f"R16_{index // 2}"))
+    for index in range(4):
+        connector_pairs.append((f"L16_{index}", f"LQF_{index // 2}"))
+        connector_pairs.append((f"R16_{index}", f"RQF_{index // 2}"))
+    for index in range(2):
+        connector_pairs.append((f"LQF_{index}", "LSF_0"))
+        connector_pairs.append((f"RQF_{index}", "RSF_0"))
+    connector_pairs.extend([("LSF_0", "FINAL"), ("RSF_0", "FINAL")])
+
+    def bracket_card(node_id: str) -> str:
+        if node_id not in rows_by_node:
+            return placeholder_card(node_id, "TBD", ["TBD", "TBD"])
+        row = rows_by_node[node_id]
+        x, y, w, h = positions[node_id]
+        team_a = str(row.team_a)
+        team_b = str(row.team_b)
+        pick = str(row.predicted_winner)
+        confidence = pct(float(row.confidence)) if pd.notna(row.confidence) else "N/A"
+        team_a_class = "picked" if team_a == pick else "team"
+        team_b_class = "picked" if team_b == pick else "team"
+        band_y = 25 if team_a == pick else 43
+        round_label = str(row.round_label)
+        meta = fmt_kickoff(row.kickoff_utc) if str(row.status) != "PREDICTED" else round_label
+        return f"""
+        <g class="live-match" transform="translate({x:.1f} {y:.1f})">
+          <rect class="confidence-pill" x="{w / 2 - 32:.1f}" y="-25" width="64" height="20" rx="10" />
+          <text class="confidence" x="{w / 2:.1f}" y="-11">{escape(confidence)}</text>
+          <rect class="live-card" width="{w}" height="{h}" rx="9" />
+          <text class="live-meta" x="12" y="15">{escape(meta)}</text>
+          <rect class="pick-band" x="8" y="{band_y}" width="{w - 16}" height="16" rx="5" />
+          <text class="{team_a_class}" x="{w / 2:.1f}" y="37">{escape(truncate(team_a))}</text>
+          <line class="live-divider" x1="10" y1="40" x2="{w - 10}" y2="40" />
+          <text class="{team_b_class}" x="{w / 2:.1f}" y="55">{escape(truncate(team_b))}</text>
+        </g>
+        """
+
+    def placeholder_card(node_id: str, title: str, lines: list[str]) -> str:
+        x, y, w, h = positions[node_id]
+        line_one = truncate(lines[0], 17) if lines else "TBD"
+        line_two = truncate(lines[1], 17) if len(lines) > 1 else "TBD"
+        return f"""
+        <g class="future-match" transform="translate({x:.1f} {y:.1f})">
+          <rect class="future-card" width="{w}" height="{h}" rx="9" />
+          <text class="future-meta" x="12" y="15">{escape(title)}</text>
+          <text class="future-team" x="{w / 2:.1f}" y="37">{escape(line_one)}</text>
+          <line class="live-divider" x1="10" y1="40" x2="{w - 10}" y2="40" />
+          <text class="future-team" x="{w / 2:.1f}" y="55">{escape(line_two)}</text>
+        </g>
+        """
+
+    match_svg = []
+    for index in range(8):
+        match_svg.append(bracket_card(f"L32_{index}"))
+        match_svg.append(bracket_card(f"R32_{index}"))
+    for index in range(4):
+        match_svg.append(bracket_card(f"L16_{index}"))
+        match_svg.append(bracket_card(f"R16_{index}"))
+    for index in range(2):
+        match_svg.append(bracket_card(f"LQF_{index}"))
+        match_svg.append(bracket_card(f"RQF_{index}"))
+    match_svg.append(bracket_card("LSF_0"))
+    match_svg.append(bracket_card("RSF_0"))
+    match_svg.append(bracket_card("FINAL"))
+
+    label_svg = "".join(
+        f'<text class="live-round-label" x="{x:.1f}" y="88">{escape(label)}</text>'
+        for label, x in [
+            ("Round of 32", left_x[0] + box_width / 2),
+            ("Round of 16", left_x[1] + box_width / 2),
+            ("Quarterfinal", left_x[2] + box_width / 2),
+            ("Semifinal", left_x[3] + box_width / 2),
+            ("Final", center_x + box_width / 2),
+            ("Semifinal", right_x[3] + box_width / 2),
+            ("Quarterfinal", right_x[2] + box_width / 2),
+            ("Round of 16", right_x[1] + box_width / 2),
+            ("Round of 32", right_x[0] + box_width / 2),
+        ]
+    )
+    connector_svg = "\n".join(connector(start, end) for start, end in connector_pairs)
+
+    html = f"""
+    <style>
+      body {{
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }}
+      .live-bracket-shell {{
+        border: 1px solid #b8914c;
+        border-radius: 8px;
+        background:
+          linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 32%),
+          #10243f;
+        box-shadow: 0 14px 38px rgba(15, 23, 42, 0.16);
+        padding: 18px 20px 12px;
+      }}
+      .live-bracket-title {{
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 18px;
+        border-bottom: 1px solid rgba(207, 164, 79, 0.45);
+        padding-bottom: 12px;
+        margin-bottom: 8px;
+      }}
+      .live-bracket-title h3 {{
+        margin: 0;
+        font-size: 22px;
+        color: #f8fafc;
+      }}
+      .live-bracket-title span {{
+        color: #cbd5e1;
+        font-size: 13px;
+      }}
+      .live-bracket-svg {{
+        width: 100%;
+        height: auto;
+        display: block;
+      }}
+      .live-connectors path {{
+        fill: none;
+        stroke: #d6b56d;
+        stroke-width: 1.45;
+      }}
+      .live-round-label {{
+        text-anchor: middle;
+        fill: #f8fafc;
+        font-size: 11px;
+        font-weight: 750;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }}
+      .live-card, .future-card {{
+        fill: #143152;
+        stroke: #d6b56d;
+        stroke-width: 1.2;
+        filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.26));
+      }}
+      .future-card {{
+        fill: #122a47;
+        stroke-dasharray: 5 4;
+      }}
+      .pick-band {{
+        fill: rgba(34, 197, 94, 0.2);
+      }}
+      .live-meta, .future-meta {{
+        fill: #d6b56d;
+        font-size: 9.5px;
+        font-weight: 750;
+      }}
+      .team, .future-team {{
+        fill: #dce7f5;
+        font-size: 15px;
+        font-weight: 650;
+        text-anchor: middle;
+      }}
+      .picked {{
+        fill: #ffffff;
+        font-size: 15px;
+        font-weight: 850;
+        text-anchor: middle;
+      }}
+      .confidence-pill {{
+        fill: #f8fafc;
+        stroke: #d6b56d;
+        stroke-width: 1;
+      }}
+      .confidence {{
+        fill: #0f172a;
+        font-size: 11px;
+        font-weight: 800;
+        text-anchor: middle;
+      }}
+      .live-divider {{
+        stroke: rgba(214, 181, 109, 0.45);
+        stroke-width: 1;
+      }}
+    </style>
+    <div class="live-bracket-shell">
+      <div class="live-bracket-title">
+        <h3>{escape(model_title)}</h3>
+        <span>Actual knockout fixtures · highlighted teams are this model's picks</span>
+      </div>
+      <svg class="live-bracket-svg" viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMin meet" role="img" aria-label="Actual fixture bracket predictions">
+        {label_svg}
+        <g class="live-connectors">{connector_svg}</g>
+        <g>{''.join(match_svg)}</g>
+      </svg>
+    </div>
+    """
+    components.html(html, height=1020, scrolling=False)
+
+
 def deterministic_bracket_frame(model_key: str, model_name: str) -> pd.DataFrame:
     data = safe_read_json(f"results/2026_{model_key}_deterministic_bracket.json")
     if not data:
@@ -922,14 +1478,21 @@ def render_two_sided_bracket(bracket: pd.DataFrame, model_title: str) -> None:
         x, y = positions[match_number]
         team_a_class = "winner" if team_a == winner else "team"
         team_b_class = "winner" if team_b == winner else "team"
+        team_a_band = '<rect class="winner-band" x="6" y="21" width="112" height="17" rx="5" />' if team_a == winner else ""
+        team_b_band = '<rect class="winner-band" x="6" y="39" width="112" height="17" rx="5" />' if team_b == winner else ""
+        team_a_dot = '<circle class="winner-dot" cx="112" cy="31" r="3" />' if team_a == winner else ""
+        team_b_dot = '<circle class="winner-dot" cx="112" cy="49" r="3" />' if team_b == winner else ""
         return f"""
         <g class="match" transform="translate({x:.1f} {y:.1f})">
-          <rect class="match-bg" width="{box_width}" height="{box_height}" rx="7" />
-          <rect class="match-head" width="{box_width}" height="18" rx="7" />
-          <text class="match-number" x="8" y="13">M{match_number}</text>
-          <text class="{team_a_class}" x="9" y="35">{escape(truncate(team_a))}</text>
-          <line class="team-divider" x1="0" y1="40" x2="{box_width}" y2="40" />
-          <text class="{team_b_class}" x="9" y="52">{escape(truncate(team_b))}</text>
+          <rect class="match-bg" width="{box_width}" height="{box_height}" rx="8" />
+          <text class="match-number" x="8" y="14">Match {match_number}</text>
+          {team_a_band}
+          {team_b_band}
+          <text class="{team_a_class}" x="10" y="34">{escape(truncate(team_a))}</text>
+          {team_a_dot}
+          <line class="team-divider" x1="8" y1="38.5" x2="116" y2="38.5" />
+          <text class="{team_b_class}" x="10" y="52">{escape(truncate(team_b))}</text>
+          {team_b_dot}
         </g>
         """
 
@@ -988,42 +1551,45 @@ def render_two_sided_bracket(bracket: pd.DataFrame, model_title: str) -> None:
       body {{
         margin: 0;
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        color: #111827;
+        color: #182230;
       }}
       .bracket-shell {{
-        border: 1px solid #d8dee8;
-        border-radius: 10px;
-        background: #ffffff;
-        padding: 16px 18px 12px;
+        border: 1px solid #e1e7ef;
+        border-radius: 8px;
+        background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+        box-shadow: 0 12px 34px rgba(15, 23, 42, 0.08);
+        padding: 18px 20px 12px;
       }}
       .bracket-title {{
         display: flex;
         justify-content: space-between;
         gap: 16px;
         align-items: flex-start;
-        border-bottom: 1px solid #e5e7eb;
+        border-bottom: 1px solid #edf1f6;
         padding-bottom: 12px;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
       }}
       .bracket-title h3 {{
         margin: 0 0 4px 0;
-        font-size: 24px;
+        font-size: 22px;
         line-height: 1.15;
+        letter-spacing: 0;
       }}
       .model-name {{
-        color: #64748b;
+        color: #667085;
         font-size: 13px;
         line-height: 1.35;
       }}
       .champion-pill {{
         white-space: nowrap;
-        border: 1px solid #15803d;
+        border: 1px solid #b7dbc6;
         color: #14532d;
-        background: #dcfce7;
+        background: #f0fdf4;
         border-radius: 999px;
-        padding: 7px 13px;
+        padding: 8px 14px;
         font-weight: 750;
         font-size: 14px;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.7);
       }}
       .bracket-svg {{
         width: 100%;
@@ -1031,36 +1597,40 @@ def render_two_sided_bracket(bracket: pd.DataFrame, model_title: str) -> None:
         display: block;
       }}
       .round-label {{
-        fill: #64748b;
-        font-size: 12px;
-        font-weight: 800;
+        fill: #667085;
+        font-size: 11px;
+        font-weight: 750;
         text-transform: uppercase;
         letter-spacing: 0.04em;
         text-anchor: middle;
       }}
       .connectors path {{
         fill: none;
-        stroke: #cbd5e1;
-        stroke-width: 1.8;
+        stroke: #aeb9c8;
+        stroke-width: 1.35;
         shape-rendering: geometricPrecision;
       }}
       .match-bg {{
-        fill: #f8fafc;
-        stroke: #d8dee8;
-        stroke-width: 1;
-      }}
-      .match-head {{
         fill: #ffffff;
+        stroke: #d9e1eb;
+        stroke-width: 1;
+        filter: drop-shadow(0 3px 5px rgba(15, 23, 42, 0.08));
       }}
       .match-number {{
-        fill: #64748b;
-        font-size: 11px;
-        font-weight: 800;
+        fill: #7a8699;
+        font-size: 9.5px;
+        font-weight: 750;
+      }}
+      .winner-band {{
+        fill: #ecfdf3;
+      }}
+      .winner-dot {{
+        fill: #16a34a;
       }}
       .team {{
-        fill: #334155;
+        fill: #344054;
         font-size: 11.5px;
-        font-weight: 600;
+        font-weight: 650;
       }}
       .winner {{
         fill: #14532d;
@@ -1068,7 +1638,7 @@ def render_two_sided_bracket(bracket: pd.DataFrame, model_title: str) -> None:
         font-weight: 850;
       }}
       .team-divider {{
-        stroke: #edf2f7;
+        stroke: #eef2f6;
         stroke-width: 1;
       }}
       @media (max-width: 900px) {{
@@ -1144,8 +1714,16 @@ def render_data_sources() -> None:
     st.header("Data Sources Used By The Dashboard")
     rows = [
         ("Today's match predictions", "results/todays_match_predictions.csv"),
+        ("Today's Poisson score forecasts", "results/todays_poisson_score_predictions.csv"),
         ("Live World Cup match cache", "data/live/world_cup_matches.csv"),
         ("Historical plus live results", "data/live/results_with_live_world_cup.csv"),
+        ("Immutable 2026 prediction ledger", "results/world_cup_2026_model_prediction_ledger.csv"),
+        ("Upcoming known-team predictions", "results/world_cup_2026_upcoming_match_predictions.csv"),
+        ("Cached fixture backfill predictions", "results/world_cup_2026_model_cached_backfill_predictions.csv"),
+        ("Live 2026 model metrics", "results/world_cup_2026_model_live_metrics.csv"),
+        ("Live 2026 match evaluation", "results/world_cup_2026_model_match_evaluation.csv"),
+        ("Actual-fixture bracket challenge scoreboard", "results/2026_model_bracket_challenge_scoreboard.csv"),
+        ("Actual-fixture bracket challenge picks", "results/2026_model_bracket_challenge_picks.csv"),
         ("Model summary", "Hard-coded recap from latest saved backtests"),
         ("Current 2026 bracket", "results/temp_2026_world_cup_current_model_predictions.csv"),
         ("Poisson deterministic bracket", "results/deterministic_poisson_bracket.json"),
@@ -1305,6 +1883,23 @@ def apply_styles() -> None:
             color: #64748b;
             max-width: 280px;
         }
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] p {
+            font-size: 1.16rem !important;
+            font-weight: 400 !important;
+            color: #1f2937;
+            letter-spacing: 0;
+        }
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a,
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a * {
+            font-size: 0.78rem !important;
+            font-weight: 400 !important;
+        }
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a {
+            border-radius: 7px;
+            margin: 2px 0;
+            padding-top: 7px;
+            padding-bottom: 7px;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -1318,29 +1913,21 @@ def main() -> None:
         layout="wide",
     )
     apply_styles()
-
-    st.title("World Cup Prediction Dashboard")
-    st.write(
-        "A local dashboard for comparing the project model families, explaining how they work, "
-        "and reviewing the saved 2026 prediction outputs."
+    page = st.navigation(
+        {
+            "Current": [
+                st.Page(render_todays_matches, title="Today's Predictions"),
+                st.Page(render_bracket_challenge, title="Bracket Challenge"),
+                st.Page(render_live_model_accuracy, title="Model Performance"),
+            ],
+            "Training / Info": [
+                st.Page(render_model_comparison, title="Model Comparison"),
+                st.Page(render_model_descriptions, title="Model Info"),
+                st.Page(render_2026_predictions, title="Pre-World Cup Predictions"),
+            ],
+        }
     )
-
-    tabs = st.tabs(
-        [
-            "Today's Matches",
-            "Model Comparison",
-            "Model Guide",
-            "2026 Predictions",
-        ]
-    )
-    with tabs[0]:
-        render_todays_matches()
-    with tabs[1]:
-        render_model_comparison()
-    with tabs[2]:
-        render_model_descriptions()
-    with tabs[3]:
-        render_2026_predictions()
+    page.run()
 
 
 if __name__ == "__main__":
